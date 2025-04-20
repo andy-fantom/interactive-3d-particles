@@ -7,6 +7,50 @@ import { ShaderParticleSystem } from './ShaderParticleSystem';
 // Create a flag to determine which particle system to use (defaults to shader version)
 const useShaderParticles = true;
 
+// Color palettes for presets
+const colorPresets = {
+  cosmic: {
+    primary: new THREE.Color(0x5e60ce),
+    secondary: new THREE.Color(0x64dfdf),
+    background1: new THREE.Color(0x050510),
+    background2: new THREE.Color(0x10051f)
+  },
+  ocean: {
+    primary: new THREE.Color(0x0077b6),
+    secondary: new THREE.Color(0x00b4d8),
+    background1: new THREE.Color(0x03045e),
+    background2: new THREE.Color(0x0096c7)
+  },
+  fire: {
+    primary: new THREE.Color(0xef476f),
+    secondary: new THREE.Color(0xffd166),
+    background1: new THREE.Color(0x540d0d),
+    background2: new THREE.Color(0x9e2a2b)
+  }
+};
+
+// Visual mode parameters
+const visualModes = {
+  sparkle: {
+    noiseScale: 0.05,
+    returnForce: 0.001,
+    particleSize: 0.15,
+    flowSpeed: 0.5
+  },
+  nebula: {
+    noiseScale: 0.02,
+    returnForce: 0.0005,
+    particleSize: 0.25,
+    flowSpeed: 0.3
+  },
+  vortex: {
+    noiseScale: 0.1,
+    returnForce: 0.002,
+    particleSize: 0.1,
+    flowSpeed: 1.2
+  }
+};
+
 // App class to manage the 3D application
 class App {
   private scene: THREE.Scene;
@@ -19,6 +63,14 @@ class App {
   private clock: THREE.Clock;
   private background: THREE.Mesh;
   private bgMaterial: THREE.ShaderMaterial;
+  private lights: {
+    ambient: THREE.AmbientLight;
+    directional: THREE.DirectionalLight;
+    point1: THREE.PointLight;
+    point2: THREE.PointLight;
+  };
+  private currentColorPreset: keyof typeof colorPresets = 'cosmic';
+  private currentVisualMode: keyof typeof visualModes = 'sparkle';
 
   constructor() {
     // Initialize properties
@@ -72,7 +124,9 @@ class App {
     this.bgMaterial = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       uniforms: {
-        time: { value: 0 }
+        time: { value: 0 },
+        color1: { value: colorPresets.cosmic.background1 },
+        color2: { value: colorPresets.cosmic.background2 }
       },
       vertexShader: `
         varying vec3 vPosition;
@@ -84,11 +138,13 @@ class App {
       `,
       fragmentShader: `
         uniform float time;
+        uniform vec3 color1;
+        uniform vec3 color2;
         varying vec3 vPosition;
         
         void main() {
-          vec3 baseColor1 = vec3(0.05, 0.05, 0.1);
-          vec3 baseColor2 = vec3(0.1, 0.05, 0.2);
+          vec3 baseColor1 = color1;
+          vec3 baseColor2 = color2;
           
           // Gradient based on position
           float t = length(vPosition.xy) / 200.0;
@@ -106,6 +162,14 @@ class App {
     this.background = new THREE.Mesh(bgGeometry, this.bgMaterial);
     this.scene.add(this.background);
     
+    // Initialize lights
+    this.lights = {
+      ambient: new THREE.AmbientLight(0xffffff, 0.5),
+      directional: new THREE.DirectionalLight(0xffffff, 1),
+      point1: new THREE.PointLight(colorPresets.cosmic.primary, 1, 100),
+      point2: new THREE.PointLight(colorPresets.cosmic.secondary, 1, 100),
+    };
+    
     // Initialize the application
     this.init();
   }
@@ -119,23 +183,30 @@ class App {
     document.getElementById('flow-speed')?.addEventListener('input', this.updateFlowSpeed.bind(this));
     document.getElementById('color-intensity')?.addEventListener('input', this.updateColorIntensity.bind(this));
     
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    this.scene.add(ambientLight);
+    // Add custom event listeners for UI controls
+    window.addEventListener('toggleAutoRotate', ((e: CustomEvent) => {
+      this.controls.autoRotate = e.detail.enabled;
+    }) as EventListener);
     
-    // Add directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(1, 1, 1);
-    this.scene.add(directionalLight);
+    window.addEventListener('changeVisualMode', ((e: CustomEvent) => {
+      this.applyVisualMode(e.detail.mode);
+    }) as EventListener);
     
-    // Add point lights for more dynamic lighting
-    const pointLight1 = new THREE.PointLight(0x3366ff, 1, 100);
-    pointLight1.position.set(30, -10, 20);
-    this.scene.add(pointLight1);
+    window.addEventListener('applyColorPreset', ((e: CustomEvent) => {
+      this.applyColorPreset(e.detail.preset);
+    }) as EventListener);
     
-    const pointLight2 = new THREE.PointLight(0xff6633, 1, 100);
-    pointLight2.position.set(-30, 10, -20);
-    this.scene.add(pointLight2);
+    // Add lights to scene
+    this.scene.add(this.lights.ambient);
+    
+    this.lights.directional.position.set(1, 1, 1);
+    this.scene.add(this.lights.directional);
+    
+    this.lights.point1.position.set(30, -10, 20);
+    this.scene.add(this.lights.point1);
+    
+    this.lights.point2.position.set(-30, 10, -20);
+    this.scene.add(this.lights.point2);
     
     // Start animation loop
     this.animate();
@@ -220,9 +291,114 @@ class App {
       this.particleSystem.setColorIntensity(value);
     }
   }
+  
+  private applyVisualMode(mode: keyof typeof visualModes): void {
+    if (!visualModes[mode]) return;
+    
+    this.currentVisualMode = mode;
+    const settings = visualModes[mode];
+    
+    // Apply visual mode settings
+    if ('setParticleSize' in this.particleSystem) {
+      (this.particleSystem as ParticleSystem).setParticleSize(settings.particleSize);
+      (document.getElementById('particle-size') as HTMLInputElement).value = settings.particleSize.toString();
+      document.getElementById('particle-size-value')!.textContent = settings.particleSize.toString();
+    }
+    
+    if ('setFlowSpeed' in this.particleSystem) {
+      this.particleSystem.setFlowSpeed(settings.flowSpeed);
+      (document.getElementById('flow-speed') as HTMLInputElement).value = settings.flowSpeed.toString();
+      document.getElementById('flow-speed-value')!.textContent = settings.flowSpeed.toString();
+    }
+    
+    // Apply animation for transition
+    gsap.to(this.camera.position, {
+      z: 50 + Math.random() * 10 - 5,
+      x: Math.random() * 10 - 5,
+      y: Math.random() * 10 - 5,
+      duration: 1.5,
+      ease: 'power2.inOut'
+    });
+    
+    // Create a ripple effect in particles
+    this.createRippleEffect();
+  }
+  
+  private applyColorPreset(preset: keyof typeof colorPresets): void {
+    if (!colorPresets[preset]) return;
+    
+    this.currentColorPreset = preset;
+    const colors = colorPresets[preset];
+    
+    // Update point lights
+    this.lights.point1.color.copy(colors.primary);
+    this.lights.point2.color.copy(colors.secondary);
+    
+    // Update background colors
+    if (this.bgMaterial.uniforms) {
+      this.bgMaterial.uniforms.color1.value = colors.background1;
+      this.bgMaterial.uniforms.color2.value = colors.background2;
+    }
+    
+    // Create a color pulse animation
+    this.createColorPulseAnimation();
+  }
+  
+  private createRippleEffect(): void {
+    // Simulate a ripple effect in the particle system
+    // This is a placeholder for a more complex implementation
+    // that would modify particle positions to create a wave
+    
+    // For now, we'll just animate the camera
+    const currentZoom = this.camera.position.z;
+    
+    gsap.timeline()
+      .to(this.camera.position, {
+        z: currentZoom - 5,
+        duration: 0.5,
+        ease: 'power1.out'
+      })
+      .to(this.camera.position, {
+        z: currentZoom,
+        duration: 0.5,
+        ease: 'power1.in'
+      });
+  }
+  
+  private createColorPulseAnimation(): void {
+    // Create a pulse of light to showcase the color change
+    const originalIntensity1 = this.lights.point1.intensity;
+    const originalIntensity2 = this.lights.point2.intensity;
+    
+    gsap.timeline()
+      .to([this.lights.point1, this.lights.point2], {
+        intensity: 3,
+        duration: 0.5,
+        ease: 'power2.out'
+      })
+      .to(this.lights.point1, {
+        intensity: originalIntensity1,
+        duration: 1,
+        ease: 'power2.in'
+      })
+      .to(this.lights.point2, {
+        intensity: originalIntensity2,
+        duration: 1,
+        ease: 'power2.in'
+      }, "-=1");
+  }
 }
 
 // Start the application when the page is loaded
 window.addEventListener('DOMContentLoaded', () => {
   new App();
 });
+
+// Add type declarations for custom events
+declare global {
+  interface WindowEventMap {
+    'toggleAutoRotate': CustomEvent<{enabled: boolean}>;
+    'changeVisualMode': CustomEvent<{mode: string}>;
+    'applyColorPreset': CustomEvent<{preset: string}>;
+  }
+}
