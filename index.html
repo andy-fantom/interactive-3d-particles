@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive 3D Particles</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background-color: #000;
+      color: white;
+    }
+    
+    #app {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .header {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #5e60ce, #64dfdf);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .logo::before {
+      content: '';
+      width: 16px;
+      height: 16px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+    }
+    
+    .info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 10;
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0.8;
+      transition: opacity 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .info:hover {
+      opacity: 1;
+    }
+    
+    .info p {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .info p:last-child {
+      margin-bottom: 0;
+    }
+    
+    .icon {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      background-color: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: opacity 0.3s ease;
+    }
+    
+    .controls-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    
+    .controls-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .toggle-controls {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    
+    .controls.collapsed {
+      height: 60px;
+      overflow: hidden;
+    }
+    
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .controls input[type="range"] {
+      width: 220px;
+      height: 6px;
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      border-radius: 3px;
+    }
+    
+    .controls input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #5e60ce, #64dfdf);
+      cursor: pointer;
+    }
+    
+    .controls input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+    }
+    
+    .checkbox-label {
+      flex-direction: row !important;
+      align-items: center;
+    }
+    
+    .mode-selector {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .mode-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .mode-button {
+      flex: 1;
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+    
+    .mode-button.active {
+      background: linear-gradient(135deg, #5e60ce, #64dfdf);
+      border-color: transparent;
+    }
+    
+    .mode-button:hover:not(.active) {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .value-display {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-left: 10px;
+    }
+    
+    .preset-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .preset-button {
+      background-color: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+    
+    .preset-button:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    @media (max-width: 768px) {
+      .controls {
+        width: calc(100% - 40px);
+        margin: 0 20px;
+        top: auto;
+        bottom: 20px;
+      }
+      
+      .info {
+        top: 80px;
+        bottom: auto;
+        left: 20px;
+      }
+    }
+    
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 1s ease;
+    }
+    
+    .loading-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .loading-animation {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    
+    .loading-animation div {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 4px solid transparent;
+      border-top-color: #5e60ce;
+      border-radius: 50%;
+      animation: spin 1.2s linear infinite;
+    }
+    
+    .loading-animation div:nth-child(2) {
+      border-top-color: #64dfdf;
+      animation-delay: -0.4s;
+    }
+    
+    .loading-animation div:nth-child(3) {
+      border-top-color: white;
+      animation-delay: -0.8s;
+    }
+    
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    
+    .loading-text {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  
+  <div class="loading-screen">
+    <div class="loading-animation">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+    <div class="loading-text">Loading particles...</div>
+  </div>
+  
+  <div class="header">
+    <div class="logo"></div>
+    <h1>Interactive 3D Particles</h1>
+  </div>
+  
+  <div class="info">
+    <p><span class="icon">🖱️</span> Move your mouse to interact with particles</p>
+    <p><span class="icon">🖲️</span> Scroll to zoom in/out</p>
+    <p><span class="icon">⚙️</span> Use controls to customize appearance</p>
+  </div>
+  
+  <div class="controls">
+    <div class="controls-header">
+      <span class="controls-title">Particle Settings</span>
+      <button class="toggle-controls">▼</button>
+    </div>
+    
+    <div class="mode-selector">
+      <span>Visual Mode:</span>
+      <div class="mode-buttons">
+        <button class="mode-button active" data-mode="sparkle">Sparkle</button>
+        <button class="mode-button" data-mode="nebula">Nebula</button>
+        <button class="mode-button" data-mode="vortex">Vortex</button>
+      </div>
+    </div>
+    
+    <label>
+      Particle Count <span class="value-display" id="particle-count-value">5000</span>
+      <input type="range" id="particle-count" min="1000" max="15000" value="5000" step="100">
+    </label>
+    
+    <label>
+      Particle Size <span class="value-display" id="particle-size-value">0.15</span>
+      <input type="range" id="particle-size" min="0.05" max="0.5" value="0.15" step="0.01">
+    </label>
+    
+    <label>
+      Flow Speed <span class="value-display" id="flow-speed-value">0.5</span>
+      <input type="range" id="flow-speed" min="0.1" max="2" value="0.5" step="0.1">
+    </label>
+    
+    <label>
+      Color Intensity <span class="value-display" id="color-intensity-value">1.0</span>
+      <input type="range" id="color-intensity" min="0.1" max="2" value="1" step="0.1">
+    </label>
+    
+    <label class="checkbox-label">
+      <input type="checkbox" id="auto-rotate" checked>
+      Auto Rotation
+    </label>
+    
+    <div>
+      <span>Color Presets:</span>
+      <div class="preset-buttons">
+        <button class="preset-button" data-preset="cosmic">Cosmic</button>
+        <button class="preset-button" data-preset="ocean">Ocean</button>
+        <button class="preset-button" data-preset="fire">Fire</button>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.ts"></script>
+  <script>
+    // Show loading screen
+    document.addEventListener('DOMContentLoaded', () => {
+      // Update value displays for sliders
+      document.querySelectorAll('input[type="range"]').forEach(slider => {
+        const valueDisplay = document.getElementById(`${slider.id}-value`);
+        if (valueDisplay) {
+          valueDisplay.textContent = slider.value;
+          slider.addEventListener('input', () => {
+            valueDisplay.textContent = slider.value;
+          });
+        }
+      });
+      
+      // Toggle controls collapse
+      const controlsPanel = document.querySelector('.controls');
+      const toggleButton = document.querySelector('.toggle-controls');
+      
+      toggleButton.addEventListener('click', () => {
+        controlsPanel.classList.toggle('collapsed');
+        toggleButton.textContent = controlsPanel.classList.contains('collapsed') ? '▲' : '▼';
+      });
+      
+      // Auto-rotate checkbox
+      const autoRotateCheckbox = document.getElementById('auto-rotate');
+      autoRotateCheckbox.addEventListener('change', (e) => {
+        window.dispatchEvent(new CustomEvent('toggleAutoRotate', {
+          detail: { enabled: e.target.checked }
+        }));
+      });
+      
+      // Visual mode buttons
+      const modeButtons = document.querySelectorAll('.mode-button');
+      modeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          modeButtons.forEach(btn => btn.classList.remove('active'));
+          button.classList.add('active');
+          
+          window.dispatchEvent(new CustomEvent('changeVisualMode', {
+            detail: { mode: button.dataset.mode }
+          }));
+        });
+      });
+      
+      // Color presets
+      document.querySelectorAll('.preset-button').forEach(button => {
+        button.addEventListener('click', () => {
+          window.dispatchEvent(new CustomEvent('applyColorPreset', {
+            detail: { preset: button.dataset.preset }
+          }));
+        });
+      });
+    });
+    
+    // Hide loading screen once everything is loaded
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.querySelector('.loading-screen').classList.add('hidden');
+      }, 1500);
+    });
+  </script>
+</body>
+</html>
